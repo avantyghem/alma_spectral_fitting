@@ -221,8 +221,8 @@ def AddComponent(m1, p1, initSpec, initVel=None):
 
     p.update( g.guess(initSpec['flux'], initSpec['vel'], w=2) )
 
-    if abs(p[pfx+'center'].value) < 1:   # lmfit explodes if the initial velocity is 0
-        p[pfx+'center'].value = abs(p[pfx+'center'].value) + 5.
+    if abs(p[pfx+'center'].value) < 3:   # lmfit explodes if the initial velocity is 0
+        p[pfx+'center'].value = abs(p[pfx+'center'].value) + 3.
 
     if initVel is not None:
         p[pfx+'center'].value = initVel

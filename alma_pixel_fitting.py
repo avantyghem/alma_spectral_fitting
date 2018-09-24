@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
 import sys
 import time
 import warnings
@@ -143,11 +144,12 @@ def extract_spectrum(cube, vel, xi, yi, beam=None, velocity_binning=1):
     spec['error'] = get_error(spec)
 
     if DEBUG:
-        print 'Spectrum rms: {}'.format(spec['error'])
+        print('Spectrum rms: {}'.format(spec['error']))
 
     return spec
 
 def BinSpectrum(spec, w=1):
+    # Bin the spectrum over width w
 
     if w == 1:
         return spec
@@ -155,7 +157,6 @@ def BinSpectrum(spec, w=1):
     flux = spec['flux']
     vel = spec['vel']
 
-    # Bin the spectrum over width w
     newv = np.array([np.mean(vel[w*i:w*(i+1)]) for i in range(len(vel)/w)])
     newf = np.array([np.mean(flux[w*i:w*(i+1)]) for i in range(len(vel)/w)])
 
@@ -335,10 +336,10 @@ def ImprovedModel(spec, alternate, null, iterations=5000, threshold=3.0):
     origAlt = getFitStats(alternate)
     fcrit = ftest( origAlt, origNull )
     if DEBUG:
-        print origNull, origAlt
+        print(origNull, origAlt)
 
     if DEBUG:
-        print 'Running {} MC iterations...'.format(iterations)
+        print('Running {} MC iterations...'.format(iterations))
 
     global runMC    # Pickle needs to be able to import the module
                     # Alternatively, could move this outside of ImprovedModel(),
@@ -371,15 +372,20 @@ def ImprovedModel(spec, alternate, null, iterations=5000, threshold=3.0):
         if len(fprob) < 0.8*iterations:
             raise ZeroDivisionError
     else:
+        # Single spectrum, so parallelize this piece
         pool = mp.Pool(mp.cpu_count())
-        ftestresult = [runMC(_) for _ in range(iterations)]
-        # ftestresult = pool.map(runMC, range(iterations))
+        # ftestresult = [runMC(_) for _ in range(iterations)]
+        if tqdm_flag:
+            rs = tqdm.tqdm(pool.imap(runMC, xrange(iterations)), total=iterations)
+            ftestresult = [r for r in rs]
+        else:
+            ftestresult = pool.map(runMC, range(iterations))
         fprob = np.array(ftestresult)
 
     p = np.sum(fprob > fcrit)
 
     if DEBUG:
-        print fcrit, p, (1-norm.cdf(threshold))*len(fprob)
+        print(fcrit, p, (1-norm.cdf(threshold))*len(fprob))
         hist, edges = np.histogram(fprob, bins=iterations/10)
         plt.bar(edges[:-1], hist, width=(edges[:-1]-edges[1:]))
         plt.axvline(fcrit, ls='--', color='k')
@@ -432,9 +438,9 @@ def RunSpectralFitting(spec, maxComps=2, varyCont=False, varySlope=False, initVe
         decentfit, greatfit = InspectComponents(spec, result, maxComps)
 
         if DEBUG and result is not None:
-            print 'Gaussian component #{}'.format(compNum)
-            print result.params
-            print decentfit, greatfit
+            print('Gaussian component #{}'.format(compNum))
+            print(result.params)
+            print(decentfit, greatfit)
             PlotSpectrum(spec, result, spec['error'])
 
         if decentfit and greatfit:
@@ -503,40 +509,89 @@ def PlotSpectrum(spec, result=None, error=None):
     plt.show()
     return
 
+def trim(full, chunk, num_chunks):
+    # Starts counting at 1
+    if num_chunks == 1:
+        return full
+
+    num_items = len(full)//num_chunks
+    if len(full) % num_chunks != 0:
+        num_items += 1
+    
+    start = (chunk-1)*num_items
+    stop = min(chunk*num_items, len(full)+1)
+    return full[start:stop]
 
 if __name__ == '__main__':
 
-    if len(sys.argv) != 4:
-        print >>sys.stderr, 'USAGE: {} fitscube region basename'.format(sys.argv[0])
-        sys.exit(-1)
-    fitscube = sys.argv[1]
-    region = sys.argv[2]
-    outbase  = sys.argv[3]
-
     global DEBUG
-
-    ##### INPUTS #####
     DEBUG = False
+
+    if len(sys.argv) != 2:
+        print('USAGE: {} input.txt'.format(sys.argv[0]), file=sys.stderr)
+        sys.exit(-1)
+
+    inputs = sys.argv[1]
+
+    ### DEFAULTS ###
+    DEBUG + False
     varyCont = False
     varySlope = False
-    initVels = None# [-100, 600]
-    numProcessors = 0    # -1 for all but 1 processor, 0 for all processors
-    thresh = 3.
-    numIter = 2500
-    maxComps = 2
+    initVels = None
+    numProcessors = 0
     velocity_binning = 1
-    ##################
+    chunk = 1
+    num_chunks = 1
+    ################
+
+    execfile(inputs)
+
+    '''
+    Input data file should contain:
+    fitscube: <string> name of input data cube
+    region: <string> name of region file for the mask
+    outbase: <string> 
+    DEBUG: <bool>
+    varyCont: <bool>
+    varySlope: <bool>
+    initVels: None or <list>
+    numProcessors: <int> -1 for all but 1 processor, 0 for all processors
+    thresh: <float>
+    numIter: <int>
+    maxComps: <int>
+    velocity_binning: <int>
+    '''
+
+    # if len(sys.argv) != 4:
+    #     print >>sys.stderr, 'USAGE: {} fitscube region basename'.format(sys.argv[0])
+    #     sys.exit(-1)
+    # fitscube = sys.argv[1]
+    # region = sys.argv[2]
+    # outbase  = sys.argv[3]
+
+    # global DEBUG
+
+    # ##### INPUTS #####
+    # thresh = 3.
+    # numIter = 0
+    # maxComps = 1
+    # velocity_binning = 2
+    # ##################
+
 
     hdr, cube = read_fits_file(fitscube)
     vel       = get_velocity(hdr)
     beam      = extract_beam_info(hdr)
 
+    if num_chunks != 1:
+        outbase += "_chunk{}of{}".format(chunk, num_chunks)
+
     if DEBUG:
-        print beam
+        print(beam)
 
     mask = create_mask(fitscube, region)
     yy, xx = np.where(mask == True)
-    pixlist = zip(xx, yy)
+    pixlist = zip(trim(xx, chunk, num_chunks), trim(yy, chunk, num_chunks))
 
     def fitPixel(ind):
         xi, yi = ind
@@ -581,8 +636,8 @@ if __name__ == '__main__':
                 while True:
                   completed = rs._index
                   if (completed == num_tasks): break
-                  print 'Waiting for', num_tasks - completed, \
-                        'of', num_tasks, 'tasks to complete...'
+                  print('Waiting for', num_tasks - completed, 
+                        'of', num_tasks, 'tasks to complete...')
                   time.sleep(60)
 
             out = [r for r in rs]   # tracks how many pixels failed
@@ -594,13 +649,13 @@ if __name__ == '__main__':
         num_finished = len(all_pstrings) - len(unfinished)
 
         if len(unfinished) != 0:
-            print 'Did not finish the following pixels:'
-            print unfinished
+            print('Did not finish the following pixels:')
+            print(unfinished)
 
         outfile = outbase + '.pkl'
-        print 'Writing results to "{}"'.format(outfile)
+        print('Writing results to "{}"'.format(outfile))
         with open(outfile, 'wb') as outf:
             for pstr in pstrs:
                 pickle.dump(pstr, outf, -1)
 
-        print 'Completed {} of {} pixels'.format(num_finished, len(pixlist))
+        print('Completed {} of {} pixels'.format(num_finished, len(pixlist)))

@@ -1,0 +1,13 @@
+fitscube = "../../line.12CO.5kmps.pbcor.fits"
+region = "large_polygon.reg"
+outbase  = "inspection"
+
+DEBUG = False
+varyCont = False
+varySlope = False
+initVels = None
+numProcessors = 0
+thresh = 3.
+numIter = 0
+maxComps = 1
+velocity_binning = 2

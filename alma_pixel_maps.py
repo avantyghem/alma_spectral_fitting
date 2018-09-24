@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
 import os
 import sys
 import pdb
@@ -18,7 +19,7 @@ except ImportError:
     MyGaussianModel = GaussianModel
 
 
-def loadFitResults(infile):
+def load_fit_results(infile):
     data = {}
     with open(infile, 'rb') as f:
         while True:
@@ -29,8 +30,14 @@ def loadFitResults(infile):
                 break
     return data
 
+def old_load_fit_results(infile):
+    with open(infile, 'rb') as f:
+        data = pickle.load(f)
+    return data
+
+
 def mergeFitResults(infiles):
-    data = [loadFitResults(f) for f in infiles]
+    data = [load_fit_results(f) for f in infiles]
     best = data[0]
 
     for d in data[1:]:
@@ -53,7 +60,7 @@ def buildModelList(fitResults):
                           weights=1/error['val'], scale_covar=False)
             modelList[ind] = res
         except TypeError:
-            print 'Index {} did not fit properly'.format(ind)
+            print('Index {} did not fit properly'.format(ind))
     return modelList
 
 def create2Dimg(imgsize, modelList, comp, key, sortedPrefixes):
@@ -153,7 +160,7 @@ def produceFitsOutput(img, almaimg, fitsname):
             try:
                 hdr[c] = almahdr[c]
             except KeyError:
-                print 'Key {} not in header'.format(c)
+                print('Key {} not in header'.format(c))
 
         return
 
@@ -270,11 +277,11 @@ def iterative_sorting(modelList, maxComps=3, **kwargs):
                 # Find the unused prefix and append it to the list
                 unusedPref = getUnusedPrefixes(modelList[ind], prefixList[ind])
                 if len(unusedPref) != 1:
-                    print 'Something went wrong in index {}'.format(ind)
-                    print maxComps, N
-                    print prefixes
-                    print prefixList[ind]
-                    print unusedPref
+                    print('Something went wrong in index {}'.format(ind))
+                    print(maxComps, N)
+                    print(prefixes)
+                    print(prefixList[ind])
+                    print(unusedPref)
                     sys.exit(-1)
                 prefixList[ind].append( unusedPref[0] )
                 trimmedModelList.pop(ind)
@@ -449,10 +456,10 @@ def checkPrefixList(prefixList, modelList):
         try:
             p = prefixList[ind]
             if len(p) != len(modelList[ind].components[1:]):
-                print 'Incorrect number of prefixes for index {}'.format(ind)
+                print('Incorrect number of prefixes for index {}'.format(ind))
                 isgood = False
         except KeyError:
-            print 'Index {} not in prefixList'.format(ind)
+            print('Index {} not in prefixList'.format(ind))
             isgood = False
     return isgood
 
@@ -461,39 +468,44 @@ def checkPrefixList(prefixList, modelList):
 if __name__ == '__main__':
 
     if len(sys.argv) < 3:
-        print >>sys.stderr,'USAGE: {} fitsimg data1 [data2 ...]'.format(sys.argv[0])
+        print('USAGE: {} fitsimg data1 [data2 ...]'.format(sys.argv[0]), 
+              file=sys.stderr)
         sys.exit(-1)
 
     fitsimg = sys.argv[1]
     data = sys.argv[2:]
-    outbase = data[0].rstrip('.pkl')
+    
+    if "chunk" in data[0]:
+        outbase = data[0].split("_chunk")[0]
+    else:
+        outbase = data[0].rstrip('.pkl').rstrip('.pickle')
 
     ##### Extra Inputs #####
     #outbase = 'Phoenix_CO32_20kmps_2sig'
     ########################
 
-    print 'Loading the data'
+    print('Loading the data')
     fitResults = mergeFitResults(data)
-    print '...done'
+    print('...done')
 
-    print 'Building the model list'
+    print('Building the model list')
     modelList  = buildModelList(fitResults)
-    print '...done'
+    print('...done')
 
-    print 'Sorting the components'
-    sortedPrefixes = sortPrefixes(modelList, algorithm='unsorted')
+    print('Sorting the components')
+    # sortedPrefixes = sortPrefixes(modelList, algorithm='unsorted')
     # sortedPrefixes = sortPrefixes(modelList, algorithm='iterative', maxComps=2)
-    #sortedPrefixes = sortPrefixes(modelList, algorithm='amplitude')
-    #sortedPrefixes = sortPrefixes(modelList, algorithm='velocity', mag=True)
-    #sortedPrefixes = sortPrefixes(modelList, algorithm='fwhm')
-    #sortedPrefixes = sortPrefixes(modelList, algorithm='match_vel', velocities=[300,500])
+    sortedPrefixes = sortPrefixes(modelList, algorithm='amplitude')
+    # sortedPrefixes = sortPrefixes(modelList, algorithm='velocity', mag=True)
+    # sortedPrefixes = sortPrefixes(modelList, algorithm='fwhm')
+    # sortedPrefixes = sortPrefixes(modelList, algorithm='match_vel', velocities=[50,-400])
     #sortedPrefixes = sortPrefixes(modelList, algorithm='match_fwhm', fwhms=[100,450])
-    print '...done'
+    print('...done')
 
     hdr, cube = read_fits_file(fitsimg)
     imgsize   = hdr['NAXIS1']
 
-    print 'Creating the images'
+    print('Creating the images')
     for comp in range(1,3):
         for key in ['amplitude', 'center', 'fwhm']:
             outfits = '{}_{}{}.fits'.format(outbase,key,comp)
@@ -502,6 +514,6 @@ if __name__ == '__main__':
 
     img = createTotalFluxImg(imgsize, modelList)
     produceFitsOutput(img, fitsimg, '{}_totalflux.fits'.format(outbase))
-    print '...done'
+    print('...done')
 
 

@@ -5,7 +5,7 @@ import sys
 import time
 import warnings
 import numpy as np
-import cPickle as pickle
+import pickle
 import multiprocessing as mp
 from matplotlib import pyplot as plt
 
@@ -44,10 +44,17 @@ def get_trimmed_HDU(fitsfile):
 
     toremove = ['NAXIS3', 'NAXIS4', 
                 'CTYPE3', 'CRVAL3', 'CDELT3', 'CRPIX3', 'CUNIT3',
-                'CTYPE4', 'CRVAL4', 'CDELT4', 'CRPIX4', 'CUNIT4',
-                'PC03_01', 'PC03_02', 'PC03_03', 'PC03_04',
-                'PC04_01', 'PC04_02', 'PC04_03', 'PC04_04',
-                'PC01_03', 'PC01_04', 'PC02_03', 'PC02_04']
+                'CTYPE4', 'CRVAL4', 'CDELT4', 'CRPIX4', 'CUNIT4']
+    if "PC03_01" in hdr:
+        pckeys = ['PC03_01', 'PC03_02', 'PC03_03', 'PC03_04',
+                  'PC04_01', 'PC04_02', 'PC04_03', 'PC04_04',
+                  'PC01_03', 'PC01_04', 'PC02_03', 'PC02_04']
+    else:
+        pckeys = ['PC3_1', 'PC3_2', 'PC3_3', 'PC3_4',
+                  'PC4_1', 'PC4_2', 'PC4_3', 'PC4_4',
+                  'PC1_3', 'PC1_4', 'PC2_3', 'PC2_4']
+    toremove += pckeys
+
     for key in toremove:
         hdr.pop(key)
 
@@ -139,7 +146,7 @@ def extract_spectrum(cube, vel, xi, yi, beam=None, velocity_binning=1):
 
     dv = (vel[1] - vel[0])  # full channel width
     spec = {'vel':vel, 'flux':flux, 'dv':dv}
-    spec = BinSpectrum(spec, velocity_binning)
+    spec = bin_spectrum(spec, velocity_binning)
 
     spec['error'] = get_error(spec)
 
@@ -148,7 +155,7 @@ def extract_spectrum(cube, vel, xi, yi, beam=None, velocity_binning=1):
 
     return spec
 
-def BinSpectrum(spec, w=1):
+def bin_spectrum(spec, w=1):
     # Bin the spectrum over width w
 
     if w == 1:
@@ -534,7 +541,7 @@ if __name__ == '__main__':
     inputs = sys.argv[1]
 
     ### DEFAULTS ###
-    DEBUG + False
+    DEBUG = False
     varyCont = False
     varySlope = False
     initVels = None

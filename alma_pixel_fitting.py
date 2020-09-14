@@ -41,31 +41,34 @@ def read_fits_file(fitscube):
     return hdr, cube
 
 
-def get_trimmed_HDU(fitsfile):
+def trim_hdu(fitsfile, hdu=0):
     # Extract a 2D image from a radio cube
     # Remove info for axes 3 (frequency) and 4 (polarization)
 
-    hdu = fits.open(fitsfile)
-    hdr = hdu[0].header
+    hdulist = fits.open(fitsfile)
+    hdr = hdulist[0].header
 
     # wcs = WCS(hdr).celestial
-    extra_keys = ["NAXIS", "CTYPE", "CRVAL", "CDELT", "CRPIX", "CUNIT"]
+    extra_keys = ["NAXIS", "CTYPE", "CRVAL", "CDELT", "CRPIX", "CUNIT", "CROTA"]
     toremove = [r + i for r in extra_keys for i in ["3", "4"]]
 
-    pc_axes = list(product(range(1, 4), [3, 4]))
-    if "PC03_01" in hdr:
-        # pc_keys = list(map(lambda x: f"PC0{x[0]}_0{x[1]}", pc_axes))
-        pc_keys = list(map(lambda x: "PC0{0}_0{1}".format(*x), pc_axes))
-    else:
-        # pc_keys = list(map(lambda x: f"PC{x[0]}_{x[1]}", pc_axes))
-        pc_keys = list(map(lambda x: "PC{0}_{1}".format(*x), pc_axes))
+    # pc_axes = list(product(range(1, 4), [3, 4]))
+    pc_axes = list(set(product(range(1,5), range(1,5))) - set(product(range(1,3), range(1,3))))
+    zero = "0" if "PC03_01" in hdr else ""
+    pc_keys = [f"PC{zero}{x[0]}_{zero}{x[1]}" for x in pc_axes]
+
+    #     pc_keys = ["PC0{0}_0{1}".format(*x) for x in pc_axes]
+    # else:
+    #     # pc_keys = [f"PC{x[0]}_{x[1]}" for x in pc_axes]
+    #     pc_keys = ["PC{0}_{1}".format(*x) for x in pc_axes]
     toremove += pc_keys
 
     for key in toremove:
-        hdr.pop(key)
+        if key in hdr:
+            hdr.pop(key)
     hdr["NAXIS"] = 2
 
-    data = hdu[0].data
+    data = hdulist[hdu].data
     im = data[0, 0, :, :]  # take a single slice
 
     newhdu = fits.PrimaryHDU(data=im, header=hdr)
@@ -77,7 +80,7 @@ def create_mask(cubefile, region):
     region are True, while those outside are False"""
     hdu = fits.open(cubefile)
     cube = hdu[0].data[0, :, :, :]
-    trimhdu = get_trimmed_HDU(cubefile)
+    trimhdu = trim_hdu(cubefile)
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -433,7 +436,7 @@ def improved_model(spec, alternate, null, iterations=5000, threshold=3.0):
 
     if DEBUG:
         print(fcrit, p, (1 - norm.cdf(threshold)) * len(fprob))
-        hist, edges = np.histogram(fprob, bins=iterations / 10)
+        hist, edges = np.histogram(fprob, bins=iterations // 10)
         plt.bar(edges[:-1], hist, width=(edges[:-1] - edges[1:]))
         plt.axvline(fcrit, ls="--", color="k")
         plt.show()

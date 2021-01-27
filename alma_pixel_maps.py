@@ -11,7 +11,7 @@ import numpy as np
 from scipy.stats import norm
 from astropy.io import fits
 
-from alma_pixel_fitting import create_empty_model, read_fits_file, get_velocity
+# from alma_pixel_fitting import create_empty_model, read_fits_file, get_velocity
 from lmfit.models import LinearModel, GaussianModel
 from matplotlib import pyplot as plt
 
@@ -21,6 +21,32 @@ except ImportError:
     print("Using the original GaussianModel")
     print("Fits have not been corrected for instrumental effetcs.")
     MyGaussianModel = GaussianModel
+
+
+def create_empty_model(numComps):
+    m = LinearModel()
+    for i in range(numComps):
+        m += MyGaussianModel(prefix="g{}_".format(i + 1))
+    return m
+
+
+def read_fits_file(fitscube):
+
+    hdulist = fits.open(fitscube)
+    hdr = hdulist[0].header
+    data = hdulist[0].data
+    cube = data[0, :, :, :]  # first dimension is the Stokes parameter
+
+    return hdr, cube
+
+
+def get_velocity(hdr):
+    width = float(hdr["CDELT3"]) / 1000.0  # in km/s
+    vmin = float(hdr["CRVAL3"]) / 1000.0
+    N = float(hdr["NAXIS3"])
+
+    velocity = vmin + width * np.arange(N)
+    return velocity
 
 
 def load_fit_results(infile):
@@ -144,7 +170,7 @@ def createTotalFluxImg(imgsize, modelList):
 
         xi, yi = ind
         img["value"][yi, xi] = sum(fluxes)
-        img["error"][yi, xi] = np.sqrt(np.sum(ferrs ** 2))
+        # img["error"][yi, xi] = np.sqrt(np.sum(ferrs ** 2))
 
     return img
 

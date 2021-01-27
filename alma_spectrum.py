@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 from __future__ import print_function
 import os
@@ -191,7 +191,7 @@ class Spectrum(object):
             mask = (self['vel'] >= vlo) & (self['vel'] <= vhi)
         else:
             mask = sigma_clip(self['flux'], sigma_lower=5.0, sigma_upper=sigma, 
-                              iters=20).mask
+                              maxiters=20).mask
 
         noise = self['flux'][~mask]
         #clipV = spec['vel'][~mask]
@@ -341,7 +341,7 @@ class Spectrum(object):
             ax = plt.subplot(111)
 
         ax.plot(vel+0.5*self.delta_v, scale*self["flux"],
-                ls='steps', marker='', color='k', linewidth=2)
+                ls='-', marker='', color='k', linewidth=2, drawstyle='steps')
         ax.fill_between(steppify(self["vel"], isX=True),
                         steppify(scale*(self["flux"]-self.error)),
                         steppify(scale*(self["flux"]+self.error)),
